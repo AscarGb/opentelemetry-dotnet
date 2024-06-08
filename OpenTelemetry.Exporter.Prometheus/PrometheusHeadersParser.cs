@@ -1,13 +1,15 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
+using System;
+
 namespace OpenTelemetry.Exporter.Prometheus;
 
-internal static class PrometheusHeadersParser
+public static class PrometheusHeadersParser
 {
     private const string OpenMetricsMediaType = "application/openmetrics-text";
 
-    internal static bool AcceptsOpenMetrics(string contentType)
+    public static bool AcceptsOpenMetrics(string contentType)
     {
         var value = contentType.AsSpan();
 

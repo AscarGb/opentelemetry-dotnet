@@ -53,48 +53,40 @@ internal sealed class PrometheusExporterMiddleware
         try
         {
             var openMetricsRequested = AcceptsOpenMetrics(httpContext.Request);
-            var collectionResponse = await this.exporter.CollectionManager.EnterCollect(openMetricsRequested).ConfigureAwait(false);
 
-            try
+            var data = await this.exporter.GetMetricsBytes(openMetricsRequested).ConfigureAwait(false);
+
+            if (data is not null)
             {
-                var dataView = openMetricsRequested ? collectionResponse.OpenMetricsView : collectionResponse.PlainTextView;
+                response.StatusCode = 200;
 
-                if (dataView.Count > 0)
-                {
-                    response.StatusCode = 200;
+                var time = data.GeneratedAtUtc;
+
 #if NET8_0_OR_GREATER
-                    response.Headers.Append("Last-Modified", collectionResponse.GeneratedAtUtc.ToString("R"));
+                    response.Headers.Append("Last-Modified", time.ToString("R"));
 #else
-                    response.Headers.Add("Last-Modified", collectionResponse.GeneratedAtUtc.ToString("R"));
+                response.Headers.Add("Last-Modified", time.ToString("R"));
 #endif
-                    response.ContentType = openMetricsRequested
-                        ? "application/openmetrics-text; version=1.0.0; charset=utf-8"
-                        : "text/plain; charset=utf-8; version=0.0.4";
+                response.ContentType = MediaTypeResolver.GetMediaType(openMetricsRequested);
 
-                    await response.Body.WriteAsync(dataView.Array, 0, dataView.Count).ConfigureAwait(false);
-                }
-                else
-                {
-                    // It's not expected to have no metrics to collect, but it's not necessarily a failure, either.
-                    response.StatusCode = 200;
-                    PrometheusExporterEventSource.Log.NoMetrics();
-                }
+                await response.Body.WriteAsync(data.Metrics, 0, data.Count).ConfigureAwait(false);
             }
-            finally
+            else
             {
-                this.exporter.CollectionManager.ExitCollect();
+                // It's not expected to have no metrics to collect, but it's not necessarily a failure, either.
+                response.StatusCode = 200;
+                PrometheusExporterEventSource.Log.NoMetrics();
             }
         }
         catch (Exception ex)
         {
             PrometheusExporterEventSource.Log.FailedExport(ex);
+
             if (!response.HasStarted)
             {
                 response.StatusCode = 500;
             }
         }
-
-        this.exporter.OnExport = null;
     }
 
     private static bool AcceptsOpenMetrics(HttpRequest request)

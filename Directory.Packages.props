@@ -54,6 +54,7 @@
     -->
     <PackageVersion Include="System.Diagnostics.DiagnosticSource" Version="8.0.0" />
 
+    <PackageVersion Include="System.Memory" Version="4.5.5" />
     <!-- A conservative version of System.Text.Encodings.Web must be used here since there is no backward compatibility guarantee during major version bumps. -->
     <PackageVersion Include="System.Text.Encodings.Web" Version="4.7.2" />
 

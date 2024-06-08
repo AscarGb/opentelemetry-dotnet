@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Exporter.Prometheus;
+using OpenTelemetry.Exporter.Prometheus.HttpListener;
 using OpenTelemetry.Internal;
 
 namespace OpenTelemetry.Metrics;
@@ -62,6 +63,25 @@ public static class PrometheusHttpListenerMeterProviderBuilderExtensions
         });
     }
 
+    /// <summary>
+    /// Adds PrometheusHttpListener to MeterProviderBuilder with output reader
+    /// </summary>
+    /// <param name="builder">MeterProviderBuilder.</param>
+    /// <returns>The instance of <see cref="MeterProviderBuilder"/>to chain calls.</returns>
+    /// <exception cref="ArgumentNullException">builder is null.</exception>
+    public static (MeterProviderBuilder Builder, Func<bool, Task<PrometheusExporterData?>>? GetData)
+            AddPrometheusExporterAndGetReader(this MeterProviderBuilder builder)
+    {
+        if (builder is null)
+        {
+            throw new ArgumentNullException(nameof(builder), "Must not be null");
+        }
+
+        var exporter = AddPrometheusExporter(builder);
+
+        return (builder, exporter.GetMetricsBytes);
+    }
+
     private static MetricReader BuildPrometheusHttpListenerMetricReader(
         PrometheusHttpListenerOptions options)
     {
@@ -96,5 +116,15 @@ public static class PrometheusHttpListenerMeterProviderBuilderExtensions
         }
 
         return reader;
+    }
+
+    private static PrometheusExporter AddPrometheusExporter(MeterProviderBuilder builder)
+    {
+        var options = new PrometheusExporterOptions();
+        var exporter = new PrometheusExporter(options);
+        var reader = new BaseExportingMetricReader(exporter);
+        reader.TemporalityPreference = MetricReaderTemporalityPreference.Cumulative;
+
+        return exporter;
     }
 }

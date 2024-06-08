@@ -1,6 +1,9 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
+using System.Security.Cryptography;
+using System.Text;
+using OpenTelemetry.Exporter.Prometheus.HttpListener;
 using OpenTelemetry.Internal;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -63,6 +66,44 @@ internal sealed class PrometheusExporter : BaseExporter<Metric>, IPullMetricExpo
     public override ExportResult Export(in Batch<Metric> metrics)
     {
         return this.OnExport(metrics);
+    }
+
+    /// <summary>
+    /// Get metrics data
+    /// </summary>
+    /// <param name="openMetricsRequested"></param>
+    /// <returns></returns>
+    public async Task<PrometheusExporterData?> GetMetricsBytes(bool openMetricsRequested)
+    {
+        try
+        {
+            var collectionResponse =
+                    await this.CollectionManager.EnterCollect(openMetricsRequested).ConfigureAwait(false);
+
+            var dataView = openMetricsRequested
+                    ? collectionResponse.OpenMetricsView
+                    : collectionResponse.PlainTextView;
+
+            if (dataView.Count > 0)
+            {
+                return new PrometheusExporterData(dataView.Array, dataView.Count, collectionResponse.GeneratedAtUtc);
+            }
+            else
+            {
+                return null;
+            }
+        }
+        finally
+        {
+            try
+            {
+                this.CollectionManager.ExitCollect();
+            }
+            finally
+            {
+                this.OnExport = null;
+            }
+        }
     }
 
     /// <inheritdoc/>
